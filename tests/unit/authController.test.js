@@ -1,6 +1,6 @@
 const authController = require('../../controllers/authController');
 const User = require('../../models/User');
-const { AppError } = require('../../middleware/errorHandler');
+// REMOVED: const { AppError } = require('../../middleware/errorHandler');
 
 // Mock User model
 jest.mock('../../models/User');
@@ -15,7 +15,7 @@ describe('Auth Controller', () => {
     };
     res = {
       status: jest.fn().mockReturnThis(),
-      json: jest.fn()
+      json: jest.fn().mockReturnThis()
     };
     next = jest.fn();
   });
@@ -87,9 +87,11 @@ describe('Auth Controller', () => {
       await authController.register(req, res, next);
 
       // Assert
-      expect(next).toHaveBeenCalledWith(
-        expect.any(AppError)
-      );
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'User with this email already exists'
+      });
     });
   });
 
@@ -108,8 +110,7 @@ describe('Auth Controller', () => {
         role: 'user',
         isActive: true,
         comparePassword: jest.fn().mockResolvedValue(true),
-        generateAuthToken: jest.fn().mockReturnValue('mockToken123'),
-        save: jest.fn()
+        generateAuthToken: jest.fn().mockReturnValue('mockToken123')
       };
 
       User.findOne.mockReturnValue({
@@ -134,6 +135,32 @@ describe('Auth Controller', () => {
           }),
           token: 'mockToken123'
         })
+      });
+    });
+
+    it('should return error for invalid credentials', async () => {
+      // Arrange
+      req.body = {
+        email: 'john@example.com',
+        password: 'WrongPassword'
+      };
+
+      const mockUser = {
+        comparePassword: jest.fn().mockResolvedValue(false)
+      };
+
+      User.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(mockUser)
+      });
+
+      // Act
+      await authController.login(req, res, next);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Invalid email or password'
       });
     });
   });

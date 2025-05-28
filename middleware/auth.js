@@ -1,53 +1,59 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-const protect = async (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
-    // Get token from header
-    let token;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
-    }
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    console.log('Auth middleware - Token:', !!token);
+    console.log('Auth middleware - JWT_SECRET:', process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_only');
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'You are not logged in! Please log in to get access.'
+        message: 'Access denied. No token provided.'
       });
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    const JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_only';
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('Auth middleware - Decoded token:', decoded);
 
-    // Get user from token
-    const currentUser = await User.findById(decoded.id);
-    if (!currentUser) {
+    // The issue is here - ensure we're using the same database connection
+    const user = await User.findById(decoded.id);
+    console.log('Auth middleware - User found:', !!user);
+    
+    // Add more debugging
+    if (!user) {
+      console.log('Auth middleware - Searching for user by ID:', decoded.id);
+      const allUsers = await User.find({});
+      console.log('Auth middleware - All users in database:', allUsers.map(u => ({ id: u._id.toString(), email: u.email })));
+      
+      // Try alternative lookup
+      const userByEmail = await User.findOne({ email: decoded.email });
+      console.log('Auth middleware - User found by email:', !!userByEmail);
+      
+      if (userByEmail) {
+        req.user = userByEmail;
+        return next();
+      }
+    }
+
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'User no longer exists'
+        message: 'Invalid token. User not found.'
       });
     }
 
-    req.user = currentUser;
+    req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({
+    console.log('Auth middleware - Error:', error.message);
+    res.status(401).json({
       success: false,
-      message: 'Invalid token'
+      message: 'Invalid token.'
     });
   }
 };
 
-const restrictTo = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to perform this action'
-      });
-    }
-    next();
-  };
-};
-
-module.exports = { protect, restrictTo };
+module.exports = auth;

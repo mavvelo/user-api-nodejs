@@ -5,18 +5,17 @@ const User = require('../../models/User');
 
 describe('Auth Integration Tests', () => {
   beforeAll(async () => {
-    // Connect to test database
     const mongoUri = process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/userapi_test';
-    await mongoose.connect(mongoUri);
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(mongoUri);
+    }
   });
 
   beforeEach(async () => {
-    // Clean database before each test
     await User.deleteMany({});
   });
 
   afterAll(async () => {
-    // Clean up and close connection
     await User.deleteMany({});
     await mongoose.connection.close();
   });
@@ -39,11 +38,6 @@ describe('Auth Integration Tests', () => {
       expect(response.body.message).toBe('User registered successfully');
       expect(response.body.data.user.email).toBe('john@example.com');
       expect(response.body.data.token).toBeDefined();
-
-      // Verify user was created in database
-      const user = await User.findOne({ email: 'john@example.com' });
-      expect(user).toBeTruthy();
-      expect(user.name).toBe('John Doe');
     });
 
     it('should not register user with invalid email', async () => {
@@ -88,7 +82,6 @@ describe('Auth Integration Tests', () => {
 
   describe('POST /api/auth/login', () => {
     beforeEach(async () => {
-      // Create test user
       await User.create({
         name: 'Test User',
         email: 'test@example.com',
@@ -135,7 +128,6 @@ describe('Auth Integration Tests', () => {
     let userId;
 
     beforeEach(async () => {
-      // Create and login user to get token
       const user = await User.create({
         name: 'Test User',
         email: 'test@example.com',

@@ -1,8 +1,28 @@
 const User = require('../models/User');
 
+// Simple email validation function
+const isValidEmail = (email) => {
+  const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+  return emailRegex.test(email);
+};
+
 const register = async (req, res) => {
   try {
     const { name, email, password, age } = req.body;
+
+    // Validate email format
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: [
+          {
+            field: 'email',
+            message: 'Please provide a valid email address'
+          }
+        ]
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -69,10 +89,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save({ validateBeforeSave: false });
-
     // Generate JWT token
     const token = user.generateAuthToken();
 
@@ -85,8 +101,7 @@ const login = async (req, res) => {
           name: user.name,
           email: user.email,
           age: user.age,
-          role: user.role,
-          lastLogin: user.lastLogin
+          role: user.role
         },
         token
       }
@@ -102,24 +117,17 @@ const login = async (req, res) => {
 
 const getMe = async (req, res) => {
   try {
-    // Simple implementation for testing - in real app would use JWT middleware
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'You are not logged in! Please log in to get access.'
-      });
-    }
+    // Get user from request (set by auth middleware)
+    const user = req.user;
 
-    // For testing, we'll just return a mock user
     res.status(200).json({
       success: true,
       data: {
         user: {
-          id: '507f1f77bcf86cd799439011',
-          name: 'Test User',
-          email: 'test@example.com',
-          role: 'user'
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role
         }
       }
     });

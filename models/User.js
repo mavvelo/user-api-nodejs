@@ -11,10 +11,13 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, 'Email is required'],
-    unique: true,
     lowercase: true,
-    trim: true
-    // NO index: true here - this was causing duplicate warning
+    trim: true,
+    match: [
+      /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+      'Please provide a valid email'
+    ]
+    // COMPLETELY REMOVED: unique: true and index: true
   },
   password: {
     type: String,
@@ -40,7 +43,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create index manually - ONLY ONCE to prevent duplicate warning
+// Create index manually - ONLY ONCE (this fixes the duplicate warning)
 userSchema.index({ email: 1 }, { unique: true });
 
 // Hash password before saving
