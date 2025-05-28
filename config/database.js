@@ -1,11 +1,40 @@
 const mongoose = require('mongoose');
+const { logger } = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/userapi');
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    const mongoURI = process.env.NODE_ENV === 'test' 
+      ? process.env.MONGODB_URI_TEST 
+      : process.env.MONGODB_URI;
+
+    const conn = await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    logger.info(`MongoDB Connected: ${conn.connection.host}`, {
+      database: conn.connection.name,
+      environment: process.env.NODE_ENV
+    });
+
+    // Handle connection events
+    mongoose.connection.on('error', (err) => {
+      logger.error('MongoDB connection error:', err);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      logger.warn('MongoDB disconnected');
+    });
+
+    // Graceful shutdown
+    process.on('SIGINT', async () => {
+      await mongoose.connection.close();
+      logger.info('MongoDB connection closed through app termination');
+      process.exit(0);
+    });
+
   } catch (error) {
-    console.error('Database connection error:', error);
+    logger.error('Database connection failed:', error);
     process.exit(1);
   }
 };
